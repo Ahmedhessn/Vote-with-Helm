@@ -1,0 +1,177 @@
+# AKS-specific values for voting-app
+# This file contains Azure Kubernetes Service optimized configurations
+
+global:
+  environment: aks
+  # Set this to your Azure Container Registry login server
+  # Example: myregistry.azurecr.io
+  imageRegistry: "<ACR_NAME>.azurecr.io"
+  # Image pull secrets (optional if AKS is attached to ACR)
+  imagePullSecrets: []
+  # Uncomment and set if using ACR pull secret
+  # imagePullSecrets: ["acr-secret"]
+
+# Namespace configuration
+namespace:
+  create: true
+  name: voting-app
+
+# Ingress configuration for AKS
+ingress:
+  enabled: true
+  # Use nginx for NGINX Ingress Controller
+  # Or azure-application-gateway for Application Gateway Ingress Controller
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # For Application Gateway, use:
+    # appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    # appgw.ingress.kubernetes.io/backend-protocol: "http"
+  hosts:
+    - host: voting-app.local  # Change to your domain
+      paths:
+        - path: /vote
+          pathType: Prefix
+        - path: /result
+          pathType: Prefix
+  # Uncomment for TLS
+  # tls:
+  #   - secretName: voting-app-tls-secret
+  #     hosts:
+  #       - voting-app.yourdomain.com
+
+# Vote service configuration
+vote:
+  enabled: true
+  image:
+    repository: vote
+    tag: v2
+    pullPolicy: Always
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    OPTION_A: "Cats"
+    OPTION_B: "Dogs"
+
+# Result service configuration
+result:
+  enabled: true
+  image:
+    repository: result
+    tag: v2
+    pullPolicy: Always
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    PORT: "4000"
+
+# Worker service configuration
+worker:
+  enabled: true
+  image:
+    repository: worker
+    tag: v2
+    pullPolicy: Always
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    # AKS default storage class
+    storageClass: "managed-csi"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  auth:
+    database: postgres
+    username: postgres
+    # IMPORTANT: Change this in production!
+    password: postgres
+    existingSecret: ""
+    secretKeys:
+      adminPasswordKey: postgres-password
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  persistence:
+    enabled: false  # Use emptyDir for development
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+# Security configuration
+security:
+  podSecurityPolicy:
+    enabled: false
+  podSecurityStandards:
+    enforce: restricted
+    audit: restricted
+    warn: restricted
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Network policies
+networkPolicy:
+  enabled: true
+  backendIsolation: true
+  databaseIsolation: true
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
