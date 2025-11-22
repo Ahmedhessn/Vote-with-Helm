@@ -1,348 +1,161 @@
-# Terraform Infrastructure as Code
+# 🗳️ Vote Application – Terraform + Kubernetes + Helm
 
-This directory contains Terraform configurations for provisioning the Voting Application infrastructure on Azure Kubernetes Service (AKS) or local Kubernetes clusters (minikube/k3s/microk8s).
+This project deploys the **Vote Application** using a complete DevOps workflow that includes:
 
-## Features
+- **Terraform** → to provision the infrastructure (AKS / Kubernetes Cluster)
+- **Kubernetes YAML Manifests** → for low-level configuration (Deployments, Services, Secrets…)
+- **Helm Charts** → for packaging and deploying the Vote App in a reusable and scalable way
 
-- ✅ **Multi-environment support** (dev, staging, prod) using Terraform workspaces and variable files
-- ✅ **Azure AKS cluster** with networking, security groups, and ingress controller
-- ✅ **Local cluster support** (minikube/k3s/microk8s) for development
-- ✅ **Azure Container Registry (ACR)** for container images
-- ✅ **Network Security Groups (NSG)** with proper firewall rules
-- ✅ **NGINX Ingress Controller** via Helm
-- ✅ **PostgreSQL and Redis** via Bitnami Helm charts with persistence
-- ✅ **Azure Monitor integration** (optional)
-- ✅ **Azure Policy** support (optional)
+---
 
-## Prerequisites
+## 📌 Project Architecture
 
-1. **Terraform** >= 1.0 installed
-   ```bash
-   terraform version
-   ```
+The system follows the classic **microservices architecture** used in the Vote App:
 
-2. **Azure CLI** installed and logged in (for Azure deployment)
-   ```bash
-   az login
-   az account set --subscription <subscription-id>
-   ```
+| Component | Description |
+|----------|-------------|
+| **Vote App** | Frontend + Backend application |
+| **Redis** | Caching layer |
+| **PostgreSQL / MySQL (optional)** | Persistent storage |
+| **Worker** | Background job processor |
+| **Result App** | Displays the voting results |
+| **Ingress Controller** | External access to the application |
+| **AKS (Azure Kubernetes Service)** | Managed Kubernetes cluster |
 
-3. **kubectl** installed
-   ```bash
-   kubectl version --client
-   ```
+---
 
-4. **Helm 3** installed
-   ```bash
-   helm version
-   ```
+## 📁 Repository Structure
 
-5. **Local Kubernetes cluster** (optional, for local development)
-   - minikube, k3s, or microk8s
+Vote-with-Helm/
+│
+├── terraform/ # Terraform IaC to deploy AKS & Networking
+│ ├── main.tf
+│ ├── variables.tf
+│ ├── outputs.tf
+│ ├── providers.tf
+│ └── backend.tf (optional)
+│
+├── helm/ # Helm chart for the full Vote Application
+│ ├── Chart.yaml
+│ ├── values.yaml
+│ └── templates/
+│ ├── vote-deployment.yaml
+│ ├── vote-service.yaml
+│ ├── result-deployment.yaml
+│ ├── result-service.yaml
+│ ├── redis-deployment.yaml
+│ ├── redis-service.yaml
+│ ├── ingress.yaml
+│ └── secrets.yaml
+│
+└── manifests/ # Raw Kubernetes YAML (for learning/testing)
+├── 01-namespace.yml
+├── 02-redis-deployment.yml
+├── 03-redis-service.yml
+├── 04-app-deployment.yml
+├── 05-app-service.yml
+├── 06-result-deployment.yml
+├── 07-result-service.yml
+└── ingress.yml
 
-## Quick Start
+yaml
+Copy code
 
-### Azure Deployment
+---
 
-1. **Initialize Terraform**
-   ```bash
-   terraform init
-   ```
+## 🚀 Deployment Workflow
 
-2. **Create/Select Workspace**
-   ```bash
-   # For development
-   terraform workspace new dev
-   terraform workspace select dev
-   
-   # For production
-   terraform workspace new prod
-   terraform workspace select prod
-   ```
-
-3. **Review and Update Variables**
-   ```bash
-   # Copy example file
-   cp terraform.tfvars.example terraform.tfvars
-   
-   # Edit terraform.tfvars with your values
-   # Or use environment-specific files:
-   # - dev.tfvars (for development)
-   # - prod.tfvars (for production)
-   ```
-
-4. **Plan Deployment**
-   ```bash
-   terraform plan -var-file=dev.tfvars
-   ```
-
-5. **Apply Configuration**
-   ```bash
-   terraform apply -var-file=dev.tfvars
-   ```
-
-6. **Get Outputs**
-   ```bash
-   terraform output
-   ```
-
-### Local Cluster Deployment
-
-1. **Set up Local Cluster**
-   ```bash
-   # For minikube
-   minikube start
-   
-   # For k3s (Linux)
-   curl -sfL https://get.k3s.io | sh -
-   
-   # For microk8s (Linux)
-   snap install microk8s --classic
-   microk8s enable dns storage ingress
-   ```
-
-2. **Configure Terraform**
-   ```bash
-   # Use dev.tfvars with deploy_to_azure = false
-   terraform apply -var-file=dev.tfvars
-   ```
-
-## Configuration Files
-
-### Variable Files
-
-- **dev.tfvars** - Development environment configuration
-- **prod.tfvars** - Production environment configuration
-- **terraform.tfvars.example** - Example configuration file
-
-### Main Files
-
-- **main.tf** - Main Terraform configuration
-- **variables.tf** - Variable definitions
-- **outputs.tf** - Output values
-
-## Key Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `environment` | Environment name (dev/staging/prod) | `dev` |
-| `deploy_to_azure` | Deploy to Azure (true) or local (false) | `false` |
-| `node_count` | Number of AKS nodes | `2` |
-| `node_vm_size` | VM size for nodes | `Standard_B2s` |
-| `deploy_postgresql_via_helm` | Use Helm for PostgreSQL | `true` |
-| `deploy_redis_via_helm` | Use Helm for Redis | `true` |
-| `postgres_password` | PostgreSQL password | `postgres` |
-
-## Multi-Environment Setup
-
-### Using Workspaces
+### **1️⃣ Deploy AKS Using Terraform**
 
 ```bash
-# Create and switch to dev workspace
-terraform workspace new dev
-terraform workspace select dev
-terraform apply -var-file=dev.tfvars
+cd terraform
+terraform init
+terraform plan
+terraform apply -auto-approve
+After the cluster is created, fetch kubeconfig:
 
-# Create and switch to prod workspace
-terraform workspace new prod
-terraform workspace select prod
-terraform apply -var-file=prod.tfvars
-```
+bash
+Copy code
+az aks get-credentials -g <resource_group> -n <cluster_name>
+2️⃣ Deploy the Application Using Helm
+bash
+Copy code
+cd helm
+helm install vote-app .
+To update the release:
 
-### Using Variable Files
+bash
+Copy code
+helm upgrade vote-app .
+To uninstall:
 
-```bash
-# Deploy to dev
-terraform apply -var-file=dev.tfvars
+bash
+Copy code
+helm uninstall vote-app
+3️⃣ (Optional) Deploy Using Raw Kubernetes YAML
+Useful for debugging, testing, or manual deployments.
 
-# Deploy to prod
-terraform apply -var-file=prod.tfvars
-```
+bash
+Copy code
+kubectl apply -f manifests/
+🔐 Secrets & Configuration
+All passwords are stored inside Kubernetes Secrets.
 
-## Infrastructure Components
+Helm supports overriding secrets via CLI:
 
-### Azure Resources (when `deploy_to_azure = true`)
+bash
+Copy code
+helm install vote-app . \
+  --set redis.password=YourPassword \
+  --set app.image.tag=v1.0.0
+You can also manage secrets manually:
 
-1. **Resource Group** - Container for all resources
-2. **Virtual Network** - Network isolation
-3. **Subnet** - AKS subnet with NSG
-4. **Network Security Group** - Firewall rules
-5. **Azure Container Registry** - Container image storage
-6. **AKS Cluster** - Kubernetes cluster
-7. **Role Assignment** - AKS access to ACR
+bash
+Copy code
+kubectl create secret generic vote-secret \
+  --from-literal=redis_password=YourPassword
+🌐 Ingress & Public Access
+After deployment, get the ingress IP:
 
-### Kubernetes Resources (all environments)
+bash
+Copy code
+kubectl get ingress
+Add a DNS record or hit the public IP directly.
 
-1. **NGINX Ingress Controller** - Via Helm
-2. **PostgreSQL** - Via Bitnami Helm chart (optional)
-3. **Redis** - Via Bitnami Helm chart (optional)
+📊 Monitoring & Scaling
+Kubernetes HPA example:
 
-## Network Security
+bash
+Copy code
+kubectl autoscale deployment vote-app --min=1 --max=5 --cpu-percent=60
+🧪 Testing the Application
+Check all running pods:
 
-The NSG includes rules for:
-- **HTTPS (443)** - Allow inbound
-- **HTTP (80)** - Allow inbound
-- **SSH (22)** - Allow from specified source IP
+bash
+Copy code
+kubectl get pods -A
+Test the service:
 
-## PostgreSQL and Redis Deployment
+bash
+Copy code
+kubectl port-forward svc/vote-service 8080:80
+Open:
 
-By default, PostgreSQL and Redis are deployed via Bitnami Helm charts with:
-- ✅ Persistence enabled (production)
-- ✅ Resource limits
-- ✅ Security contexts (non-root)
-- ✅ Storage classes (Azure: managed-csi)
+arduino
+Copy code
+http://localhost:8080
+🧹 Cleanup
+Remove Helm resources:
 
-To use Kubernetes manifests instead:
-```hcl
-deploy_postgresql_via_helm = false
-deploy_redis_via_helm = false
-```
+bash
+Copy code
+helm uninstall vote-app
+Remove the cluster:
 
-Then deploy using the manifests in `k8s/base/` or `aks/` directories.
-
-## Outputs
-
-After deployment, get important information:
-
-```bash
-terraform output
-```
-
-Key outputs:
-- `aks_cluster_name` - AKS cluster name
-- `acr_login_server` - ACR login server for pushing images
-- `cluster_endpoint` - Kubernetes API endpoint
-- `postgresql_status` - PostgreSQL deployment status
-- `redis_status` - Redis deployment status
-
-## Secrets Management
-
-### Development
-
-Passwords are set via variables (not recommended for production):
-```hcl
-postgres_password = "your-password"
-```
-
-### Production
-
-For production, use Azure Key Vault:
-
-1. **Create Key Vault**
-   ```bash
-   az keyvault create --name <vault-name> --resource-group <rg-name>
-   ```
-
-2. **Store Secrets**
-   ```bash
-   az keyvault secret set --vault-name <vault-name> --name postgres-password --value <password>
-   ```
-
-3. **Reference in Terraform**
-   ```hcl
-   data "azurerm_key_vault_secret" "postgres_password" {
-     name         = "postgres-password"
-     key_vault_id = azurerm_key_vault.main.id
-   }
-   
-   postgres_password = data.azurerm_key_vault_secret.postgres_password.value
-   ```
-
-## Local Cluster Trade-offs
-
-See [LOCAL_CLUSTER_TRADEOFFS.md](./LOCAL_CLUSTER_TRADEOFFS.md) for detailed comparison.
-
-### Quick Summary
-
-| Feature | Azure AKS | Local (minikube/k3s/microk8s) |
-|---------|-----------|-------------------------------|
-| Cost | Pay per use | Free |
-| Scalability | High | Limited |
-| Production Ready | Yes | No |
-| Networking | Advanced | Basic |
-| Storage | Managed | Local |
-| Monitoring | Azure Monitor | Manual setup |
-
-## Troubleshooting
-
-### Terraform Errors
-
-```bash
-# Refresh state
-terraform refresh
-
-# Validate configuration
-terraform validate
-
-# Show current state
-terraform show
-```
-
-### AKS Connection Issues
-
-```bash
-# Get credentials
-az aks get-credentials --resource-group <rg-name> --name <cluster-name>
-
-# Verify connection
-kubectl get nodes
-```
-
-### Helm Release Issues
-
-```bash
-# List releases
-helm list -A
-
-# Check release status
-helm status <release-name> -n <namespace>
-
-# Uninstall if needed
-helm uninstall <release-name> -n <namespace>
-```
-
-## Cleanup
-
-### Destroy Infrastructure
-
-```bash
-# Destroy all resources
-terraform destroy -var-file=dev.tfvars
-```
-
-**Warning:** This will delete all resources including persistent data!
-
-### Selective Cleanup
-
-```bash
-# Remove specific resource
-terraform destroy -target=azurerm_kubernetes_cluster.main -var-file=dev.tfvars
-```
-
-## Best Practices
-
-1. **Use Workspaces** - Separate state for each environment
-2. **Version Control** - Commit `.tfvars` files (without secrets)
-3. **Backend Configuration** - Use remote state (Azure Storage)
-4. **Secrets Management** - Use Azure Key Vault for production
-5. **Resource Tagging** - All resources are tagged for cost tracking
-6. **Review Plans** - Always review `terraform plan` before applying
-
-## Next Steps
-
-After infrastructure is provisioned:
-
-1. **Build and Push Images** to ACR
-2. **Deploy Application** using Helm or kubectl
-   - See `aks/HELM_DEPLOYMENT_GUIDE.md` for Helm
-   - See `aks/DEPLOYMENT_GUIDE.md` for kubectl
-
-## Support
-
-For issues:
-1. Check Terraform logs
-2. Verify Azure permissions
-3. Review variable values
-4. Check Kubernetes cluster status
-#   V o t e - w i t h - H e l m  
- 
+bash
+Copy code
+cd terraform
+terraform destroy
+👨‍💻 Author
+Ahmed Hessn
+DevOps Engineer
